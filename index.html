@@ -32,7 +32,7 @@
         import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/11.3.0/firebase-database.js";
 
         const firebaseConfig = {
-            apiKey: "YOUR_API_KEY", // 자신의 Firebase API 키로 대체하세요.
+            apiKey: "YOUR_API_KEY",
             authDomain: "team-score-manager.firebaseapp.com",
             databaseURL: "https://team-score-manager-default-rtdb.firebaseio.com/",
             projectId: "team-score-manager",
@@ -46,28 +46,22 @@
         const db = getDatabase(app);
         const teamsRef = ref(db, "teams");
 
-        // 팀 추가 함수
-        async function addTeam() {
-            const teamName = document.getElementById("teamName").value.trim();
-            if (!teamName) {
-                console.error("팀 이름이 비어 있습니다.");
-                return;
+        // 10개의 팀 초기화
+        async function initializeTeams() {
+            const initialTeams = {};
+            for (let i = 1; i <= 10; i++) {
+                initialTeams[`team${i}`] = {
+                    name: `Team ${i}`,
+                    scores: [0, 0, 0, 0, 0],
+                    total: 0
+                };
             }
-
-            const newTeam = {
-                name: teamName,
-                scores: [0, 0, 0, 0, 0],
-                total: 0
-            };
-
             try {
-                await update(teamsRef, { [teamName]: newTeam });
-                console.log("팀 추가 성공:", newTeam);
+                await set(teamsRef, initialTeams);
+                console.log("팀 초기화 성공");
             } catch (error) {
-                console.error("팀 추가 실패:", error);
+                console.error("팀 초기화 실패:", error);
             }
-
-            document.getElementById("teamName").value = "";
         }
 
         // 점수 업데이트 함수
@@ -84,24 +78,6 @@
                 }
             } catch (error) {
                 console.error("점수 업데이트 실패:", error);
-            }
-        }
-
-        // 데이터 초기화 함수
-        async function resetScores() {
-            try {
-                const snapshot = await get(teamsRef);
-                if (snapshot.exists()) {
-                    const teams = snapshot.val();
-                    for (let teamName in teams) {
-                        teams[teamName].scores = [0, 0, 0, 0, 0];
-                        teams[teamName].total = 0;
-                    }
-                    await set(teamsRef, teams);
-                    console.log("데이터 초기화 성공");
-                }
-            } catch (error) {
-                console.error("데이터 초기화 실패:", error);
             }
         }
 
@@ -133,16 +109,15 @@
             });
         }
 
-        // 페이지 로드 시 테이블 업데이트 시작
-        window.onload = updateTable;
+        // 초기화 및 테이블 업데이트 시작
+        window.onload = () => {
+            initializeTeams();
+            updateTable();
+        };
     </script>
 </head>
 <body>
     <h1>팀 점수 관리 시스템</h1>
-    <input type="text" id="teamName" placeholder="팀 이름 입력">
-    <button onclick="addTeam()">팀 추가</button>
-    <button onclick="resetScores()">초기화</button>
-
     <table id="scoreTable">
         <thead>
             <tr>
