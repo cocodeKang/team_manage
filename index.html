@@ -67,12 +67,13 @@
         // 점수 업데이트 함수
         async function updateScore(teamName, gameIndex, value) {
             try {
+                console.log(`팀: ${teamName}, 게임 ${gameIndex + 1}, 점수: ${value}`);
                 const snapshot = await get(teamsRef);
                 if (snapshot.exists()) {
                     const teams = snapshot.val();
                     if (teams[teamName]) {
                         teams[teamName].scores[gameIndex] = parseInt(value) || 0;
-                        teams[teamName].total = teams[teamName].scores.reduce((a, b) => a + b, 0);
+                        teams[teamName].total = teams[teamName].scores.reduce((a, b) => a + b, 0;
                         await update(teamsRef, { [teamName]: teams[teamName] });
                     }
                 }
@@ -113,15 +114,22 @@
             });
         }
 
-        // 초기화 및 테이블 업데이트 시작
+        // 초기화 버튼 이벤트
+        document.getElementById("resetButton").addEventListener("click", () => {
+            if (confirm("정말 데이터를 초기화하시겠습니까?")) {
+                initializeTeams();
+            }
+        });
+
+        // 페이지 로드 시 데이터 유지
         window.onload = () => {
-            initializeTeams();
             updateTable();
         };
     </script>
 </head>
 <body>
     <h1>팀 점수 관리 시스템</h1>
+    <button id="resetButton">초기화</button>
     <table id="scoreTable">
         <thead>
             <tr>
