@@ -100,10 +100,8 @@
                             const input = document.createElement("input");
                             input.type = "number";
                             input.value = score;
-                            input.onkeypress = (e) => {
-                                if (e.key === 'Enter') {
-                                    updateScore(team.name, gameIndex, e.target.value);
-                                }
+                            input.onchange = (e) => {
+                                updateScore(team.name, gameIndex, e.target.value);
                             };
                             cell.appendChild(input);
                         });
@@ -115,10 +113,12 @@
         }
 
         // 초기화 버튼 이벤트
-        document.getElementById("resetButton").addEventListener("click", () => {
-            if (confirm("정말 데이터를 초기화하시겠습니까?")) {
-                initializeTeams();
-            }
+        document.addEventListener("DOMContentLoaded", () => {
+            document.getElementById("resetButton").addEventListener("click", () => {
+                if (confirm("정말 데이터를 초기화하시겠습니까?")) {
+                    initializeTeams();
+                }
+            });
         });
 
         // 페이지 로드 시 데이터 유지
