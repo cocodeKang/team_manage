@@ -25,6 +25,9 @@
     input[type="number"] {
       width: 50px;
     }
+    input[type="text"] {
+      width: 100px;
+    }
   </style>
 </head>
 <body>
@@ -34,6 +37,7 @@
     <thead>
       <tr>
         <th>순위</th>
+        <th>팀 번호</th>
         <th>팀 이름</th>
         <th>게임1</th>
         <th>게임2</th>
@@ -51,6 +55,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.3.0/firebase-app.js";
     import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/11.3.0/firebase-database.js";
 
+    // Firebase 초기화 설정
     const firebaseConfig = {
       apiKey: "YOUR_API_KEY",
       authDomain: "team-score-manager.firebaseapp.com",
@@ -66,10 +71,14 @@
     const db = getDatabase(app);
     const teamsRef = ref(db, "teams");
 
+    // teams가 없으면 10개의 팀 데이터로 초기화 (각 팀에 고유 id와 팀 번호 추가)
     async function initializeTeams() {
       const initialTeams = {};
-      for (let i = 1; i <= 9; i++) {
-        initialTeams[`team${i}`] = {
+      for (let i = 1; i <= 10; i++) {
+        const teamId = `team${i}`;
+        initialTeams[teamId] = {
+          id: teamId,
+          number: i,
           name: `Team ${i}`,
           scores: [0, 0, 0, 0, 0],
           total: 0
@@ -78,46 +87,98 @@
       await set(teamsRef, initialTeams);
     }
 
-    async function updateScore(teamName, gameIndex, value) {
-      const snapshot = await get(teamsRef);
+    // 특정 팀의 게임 점수 업데이트 함수
+    async function updateScore(teamId, gameIndex, value) {
+      const teamRef = ref(db, `teams/${teamId}`);
+      const snapshot = await get(teamRef);
       if (snapshot.exists()) {
-        const teams = snapshot.val();
-        if (teams[teamName]) {
-          teams[teamName].scores[gameIndex] = parseInt(value) || 0;
-          teams[teamName].total = teams[teamName].scores.reduce((a, b) => a + b, 0);
-          await update(ref(db, `teams/${teamName}`), teams[teamName]);
-        }
+        const team = snapshot.val();
+        const newScore = parseInt(value) || 0;
+        team.scores[gameIndex] = newScore;
+        team.total = team.scores.reduce((a, b) => a + b, 0);
+        await update(teamRef, team);
       }
     }
 
+    // 팀 이름 업데이트 함수
+    async function updateTeamName(teamId, newName) {
+      const teamRef = ref(db, `teams/${teamId}`);
+      await update(teamRef, { name: newName });
+    }
+
+    // Firebase의 데이터를 실시간으로 받아와 테이블 업데이트
     function updateTable() {
       onValue(teamsRef, (snapshot) => {
+        const tbody = document.querySelector("#scoreTable tbody");
+        tbody.innerHTML = "";  // 기존 테이블 초기화
+
         if (snapshot.exists()) {
-          const tbody = document.querySelector("#scoreTable tbody");
-          tbody.innerHTML = "";
+          const teamsData = snapshot.val();
+          // 객체를 배열로 변환 (각 팀의 id, number 등을 포함)
+          const teams = Object.values(teamsData);
 
-          const teams = Object.values(snapshot.val()).sort((a, b) => b.total - a.total);
-          teams.forEach((team, index) => {
+          // 총점 기준 내림차순 정렬하여 순위 계산 (동점은 동일 순위)
+          const sortedByTotal = [...teams].sort((a, b) => b.total - a.total);
+          const rankMap = {};
+          let currentRank = 1;
+          sortedByTotal.forEach((team, index) => {
+            if (index === 0) {
+              rankMap[team.id] = currentRank;
+            } else {
+              if (team.total === sortedByTotal[index - 1].total) {
+                rankMap[team.id] = currentRank;
+              } else {
+                currentRank = index + 1;
+                rankMap[team.id] = currentRank;
+              }
+            }
+          });
+
+          // 화면에는 팀 번호 순(1~10)으로 정렬해서 표시
+          teams.sort((a, b) => a.number - b.number);
+          teams.forEach((team) => {
             const row = tbody.insertRow();
-            row.insertCell().textContent = index + 1;
-            row.insertCell().textContent = team.name;
 
+            // 순위 셀 (총점에 따른 순위)
+            const rankCell = row.insertCell();
+            rankCell.textContent = rankMap[team.id] || "-";
+
+            // 팀 번호 셀
+            const teamNumberCell = row.insertCell();
+            teamNumberCell.textContent = team.number;
+
+            // 팀 이름 셀 (수정 가능한 텍스트 입력 필드)
+            const teamNameCell = row.insertCell();
+            const teamNameInput = document.createElement("input");
+            teamNameInput.type = "text";
+            teamNameInput.value = team.name;
+            teamNameInput.onchange = (e) => updateTeamName(team.id, e.target.value);
+            teamNameCell.appendChild(teamNameInput);
+
+            // 게임 점수 입력 필드 (각 게임별)
             team.scores.forEach((score, gameIndex) => {
               const cell = row.insertCell();
               const input = document.createElement("input");
               input.type = "number";
               input.value = score;
-              input.onchange = (e) => updateScore(team.name, gameIndex, e.target.value);
+              input.onchange = (e) => updateScore(team.id, gameIndex, e.target.value);
               cell.appendChild(input);
             });
 
-            row.insertCell().textContent = team.total;
+            // 합계 셀
+            const totalCell = row.insertCell();
+            totalCell.textContent = team.total;
           });
         }
       });
     }
 
-    document.addEventListener("DOMContentLoaded", () => {
+    // DOMContentLoaded 시점에 데이터 존재 여부 확인 및 초기화, 이벤트 등록
+    document.addEventListener("DOMContentLoaded", async () => {
+      const snapshot = await get(teamsRef);
+      if (!snapshot.exists()) {
+        await initializeTeams();
+      }
       document.getElementById("resetButton").addEventListener("click", () => {
         if (confirm("정말 데이터를 초기화하시겠습니까?")) {
           initializeTeams();
