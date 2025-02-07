@@ -9,10 +9,6 @@
       font-family: Arial, sans-serif;
       text-align: center;
     }
-    /* 비밀번호 인증 영역 스타일 */
-    #authContainer {
-      margin: 20px;
-    }
     /* 가로 스크롤을 위한 컨테이너 */
     .table-container {
       overflow-x: auto;
@@ -62,13 +58,6 @@
   </style>
 </head>
 <body>
-  <!-- 비밀번호 인증 영역 -->
-  <div id="authContainer">
-    <label for="passwordInput">비밀번호:</label>
-    <input type="password" id="passwordInput">
-    <button id="checkPasswordButton">확인</button>
-  </div>
-  
   <h1>겨울성경학교 코너학습게임 점수표</h1>
   <button id="resetButton">초기화</button>
   <div class="table-container">
@@ -129,18 +118,6 @@
     const db = getDatabase(app);
     const teamsRef = ref(db, "teams");
 
-    // 비밀번호 인증 관련 변수 (예시: 올바른 비밀번호는 "1234")
-    let isAuthorized = false;
-    document.getElementById("checkPasswordButton").addEventListener("click", () => {
-      const pwd = document.getElementById("passwordInput").value;
-      if (pwd === "1234") {
-        isAuthorized = true;
-        alert("비밀번호가 확인되었습니다.");
-      } else {
-        alert("비밀번호가 틀렸습니다.");
-      }
-    });
-
     // 초기 팀 데이터 (10팀 생성)
     async function initializeTeams() {
       const initialTeams = {};
@@ -157,12 +134,8 @@
       await set(teamsRef, initialTeams);
     }
 
-    // 팀 점수 업데이트 함수 – 비밀번호 인증 확인 후 업데이트
+    // 팀 점수 업데이트 함수 (비밀번호 없이 자유롭게 업데이트)
     async function updateScore(teamId, gameIndex, value) {
-      if (!isAuthorized) {
-        alert("먼저 올바른 비밀번호를 입력하세요.");
-        return;
-      }
       const teamRef = ref(db, `teams/${teamId}`);
       const snapshot = await get(teamRef);
       if (snapshot.exists()) {
@@ -175,12 +148,8 @@
       }
     }
 
-    // 팀 이름 업데이트 함수 – 비밀번호 인증 확인 후 업데이트
+    // 팀 이름 업데이트 함수 (비밀번호 없이 자유롭게 업데이트)
     async function updateTeamName(teamId, newName) {
-      if (!isAuthorized) {
-        alert("먼저 올바른 비밀번호를 입력하세요.");
-        return;
-      }
       const teamRef = ref(db, `teams/${teamId}`);
       console.log(`팀 ${teamId}의 이름 업데이트:`, newName);
       await update(teamRef, { name: newName });
@@ -221,7 +190,7 @@
             }
           });
 
-          // 1위가 가장 위로 오도록 순위 오름차순 정렬
+          // 1위가 가장 위에 오도록 순위 오름차순 정렬
           teams.sort((a, b) => a.rank - b.rank);
 
           teams.forEach((team) => {
@@ -240,7 +209,7 @@
             nameInput.onchange = (e) => updateTeamName(team.id, e.target.value);
             nameCell.appendChild(nameInput);
 
-            // 각 게임별 점수 입력 – 입력란과 함께 –10, +10 버튼 추가
+            // 각 게임별 점수 입력 – 입력란과 함께 –10, +10 버튼 추가 (step=10 적용)
             team.scores.forEach((score, gameIndex) => {
               const cell = row.insertCell();
               const container = document.createElement("div");
@@ -296,7 +265,13 @@
       if (!teamsSnapshot.exists()) {
         await initializeTeams();
       }
+      // 초기화 버튼: 클릭 시 비밀번호(4787)를 prompt로 입력받아 확인 후 초기화 실행
       document.getElementById("resetButton").addEventListener("click", async () => {
+        const pwd = prompt("초기화를 위한 비밀번호를 입력하세요:");
+        if (pwd !== "4787") {
+          alert("비밀번호가 틀렸습니다.");
+          return;
+        }
         if (confirm("정말 데이터를 초기화하시겠습니까?")) {
           await initializeTeams();
         }
