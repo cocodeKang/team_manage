@@ -1,112 +1,161 @@
-<script type="module">
-    // Firebase 설정
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.3.0/firebase-app.js";
-    import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/11.3.0/firebase-database.js";
-
-    const firebaseConfig = {
-        apiKey: "YOUR_API_KEY",
-        authDomain: "team-score-manager.firebaseapp.com",
-        databaseURL: "https://team-score-manager-default-rtdb.firebaseio.com/",
-        projectId: "team-score-manager",
-        storageBucket: "team-score-manager.appspot.com",
-        messagingSenderId: "566490541048",
-        appId: "1:566490541048:web:050eb2f4984872da91440d",
-        measurementId: "G-4DH92WNSPF"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-    const teamsRef = ref(db, "teams");
-
-    // 10개의 팀 초기화
-    async function initializeTeams() {
-        const initialTeams = {};
-        for (let i = 1; i <= 10; i++) {
-            initialTeams[`team${i}`] = {
-                name: `Team ${i}`,
-                scores: [0, 0, 0, 0, 0],
-                total: 0
-            };
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>팀 점수 관리</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
         }
-        try {
-            await set(teamsRef, initialTeams);
-            console.log("팀 초기화 성공");
-        } catch (error) {
-            console.error("팀 초기화 실패:", error);
+        table {
+            width: 80%;
+            margin: 20px auto;
+            border-collapse: collapse;
         }
-    }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+        input[type="number"] {
+            width: 50px;
+        }
+    </style>
+    <script type="module">
+        // Firebase 설정
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.3.0/firebase-app.js";
+        import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/11.3.0/firebase-database.js";
 
-    // 점수 업데이트 함수
-    async function updateScore(teamName, gameIndex, value) {
-        try {
-            console.log(`팀: ${teamName}, 게임 ${gameIndex + 1}, 점수: ${value}`);
-            const snapshot = await get(teamsRef);
-            if (snapshot.exists()) {
-                const teams = snapshot.val();
-                if (teams[teamName]) {
-                    teams[teamName].scores[gameIndex] = parseInt(value) || 0;
-                    teams[teamName].total = teams[teamName].scores.reduce((a, b) => a + b, 0);
-                    await update(teamsRef, { [teamName]: teams[teamName] });
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "team-score-manager.firebaseapp.com",
+            databaseURL: "https://team-score-manager-default-rtdb.firebaseio.com/",
+            projectId: "team-score-manager",
+            storageBucket: "team-score-manager.appspot.com",
+            messagingSenderId: "566490541048",
+            appId: "1:566490541048:web:050eb2f4984872da91440d",
+            measurementId: "G-4DH92WNSPF"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const teamsRef = ref(db, "teams");
+
+        // 10개의 팀 초기화
+        async function initializeTeams() {
+            const initialTeams = {};
+            for (let i = 1; i <= 10; i++) {
+                initialTeams[`team${i}`] = {
+                    name: `Team ${i}`,
+                    scores: [0, 0, 0, 0, 0],
+                    total: 0
+                };
+            }
+            try {
+                await set(teamsRef, initialTeams);
+                console.log("팀 초기화 성공");
+            } catch (error) {
+                console.error("팀 초기화 실패:", error);
+            }
+        }
+
+        // 점수 업데이트 함수
+        async function updateScore(teamName, gameIndex, value) {
+            try {
+                console.log(`팀: ${teamName}, 게임 ${gameIndex + 1}, 점수: ${value}`);
+                const snapshot = await get(teamsRef);
+                if (snapshot.exists()) {
+                    const teams = snapshot.val();
+                    if (teams[teamName]) {
+                        teams[teamName].scores[gameIndex] = parseInt(value) || 0;
+                        teams[teamName].total = teams[teamName].scores.reduce((a, b) => a + b, 0);
+                        await update(teamsRef, { [teamName]: teams[teamName] });
+                    }
                 }
+            } catch (error) {
+                console.error("점수 업데이트 실패:", error);
             }
-        } catch (error) {
-            console.error("점수 업데이트 실패:", error);
         }
-    }
 
-    // 실시간 데이터 테이블 업데이트
-    // 실시간 데이터 테이블 업데이트
-function updateTable() {
-    onValue(teamsRef, (snapshot) => {
-        if (snapshot.exists()) {
-            const scoreTable = document.getElementById("scoreTable");
-            if (scoreTable) {
-                const tbody = scoreTable.querySelector("tbody");
-                if (tbody) {
-                    const teams = Object.values(snapshot.val()).sort((a, b) => b.total - a.total);
-                    tbody.innerHTML = "";
+        // 실시간 데이터 테이블 업데이트
+        function updateTable() {
+            onValue(teamsRef, (snapshot) => {
+                if (snapshot.exists()) {
+                    const scoreTable = document.getElementById("scoreTable");
+                    if (scoreTable) {
+                        const tbody = scoreTable.querySelector("tbody");
+                        if (tbody) {
+                            const teams = Object.values(snapshot.val()).sort((a, b) => b.total - a.total);
+                            tbody.innerHTML = "";
 
-                    teams.forEach((team, index) => {
-                        const row = tbody.insertRow();
-                        row.insertCell().textContent = index + 1;
-                        row.insertCell().textContent = team.name;
+                            teams.forEach((team, index) => {
+                                const row = tbody.insertRow();
+                                row.insertCell().textContent = index + 1;
+                                row.insertCell().textContent = team.name;
 
-                        team.scores.forEach((score, gameIndex) => {
-                            const cell = row.insertCell();
-                            const input = document.createElement("input");
-                            input.type = "number";
-                            input.value = score;
-                            input.onchange = (e) => {
-                                updateScore(team.name, gameIndex, e.target.value);
-                            };
-                            cell.appendChild(input);
-                        });
+                                team.scores.forEach((score, gameIndex) => {
+                                    const cell = row.insertCell();
+                                    const input = document.createElement("input");
+                                    input.type = "number";
+                                    input.value = score;
+                                    input.onchange = (e) => {
+                                        updateScore(team.name, gameIndex, e.target.value);
+                                    };
+                                    cell.appendChild(input);
+                                });
 
-                        row.insertCell().textContent = team.total;
-                    });
-                } else {
-                    console.error("tbody element not found");
+                                row.insertCell().textContent = team.total;
+                            });
+                        } else {
+                            console.error("tbody element not found");
+                        }
+                    } else {
+                        console.error("scoreTable element not found");
+                    }
                 }
-            } else {
-                console.error("scoreTable element not found");
-            }
+            });
         }
-    });
-}
 
-    // 초기화 버튼 이벤트
-    document.addEventListener("DOMContentLoaded", () => {
-        document.getElementById("resetButton").addEventListener("click", () => {
-            if (confirm("정말 데이터를 초기화하시겠습니까?")) {
-                initializeTeams();
-            }
+        // 초기화 버튼 이벤트 및 DOM 준비
+        document.addEventListener("DOMContentLoaded", () => {
+            document.getElementById("resetButton").addEventListener("click", () => {
+                if (confirm("정말 데이터를 초기화하시겠습니까?")) {
+                    initializeTeams();
+                }
+            });
+            // 실시간 업데이트 이벤트 등록
+            updateTable();
         });
-        // Attach the event listener for real-time data reflection
-        updateTable();
-    });
 
-    // 페이지 로드 시 데이터 유지
-    window.onload = () => {
-        updateTable();
-    };
-</script>
+        // 페이지 로드 시 데이터 유지
+        window.onload = () => {
+            updateTable();
+        };
+    </script>
+</head>
+<body>
+    <h1>팀 점수 관리 시스템</h1>
+    <button id="resetButton">초기화</button>
+    <table id="scoreTable">
+        <thead>
+            <tr>
+                <th>순위</th>
+                <th>팀 이름</th>
+                <th>게임1</th>
+                <th>게임2</th>
+                <th>게임3</th>
+                <th>게임4</th>
+                <th>게임5</th>
+                <th>합계</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+</body>
+</html>
