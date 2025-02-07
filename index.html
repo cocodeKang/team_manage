@@ -73,7 +73,7 @@
                     const teams = snapshot.val();
                     if (teams[teamName]) {
                         teams[teamName].scores[gameIndex] = parseInt(value) || 0;
-                        teams[teamName].total = teams[teamName].scores.reduce((a, b) => a + b, 0;
+                        teams[teamName].total = teams[teamName].scores.reduce((a, b) => a + b, 0);
                         await update(teamsRef, { [teamName]: teams[teamName] });
                     }
                 }
