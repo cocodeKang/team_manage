@@ -66,52 +66,51 @@
 
         // 점수 업데이트 함수
         async function updateScore(teamName, gameIndex, value) {
-    try {
-        const snapshot = await get(teamsRef);
-        if (snapshot.exists()) {
-            const teams = snapshot.val();
-            if (teams[teamName]) {
-                teams[teamName].scores[gameIndex] = parseInt(value) || 0;
-                teams[teamName].total = teams[teamName].scores.reduce((a, b) => a + b, 0);
-                console.log("업데이트할 데이터:", teams[teamName]);
-                await update(teamsRef, { [teamName]: teams[teamName] });
-                console.log("점수 업데이트 성공");
+            try {
+                const snapshot = await get(teamsRef);
+                if (snapshot.exists()) {
+                    const teams = snapshot.val();
+                    if (teams[teamName]) {
+                        teams[teamName].scores[gameIndex] = parseInt(value) || 0;
+                        teams[teamName].total = teams[teamName].scores.reduce((a, b) => a + b, 0);
+                        await update(teamsRef, { [teamName]: teams[teamName] });
+                    }
+                }
+            } catch (error) {
+                console.error("점수 업데이트 실패:", error);
             }
         }
-    } catch (error) {
-        console.error("점수 업데이트 실패:", error);
-    }
-}
 
-        
         // 실시간 데이터 테이블 업데이트
         function updateTable() {
             onValue(teamsRef, (snapshot) => {
-    if (snapshot.exists()) {
-        console.log("Firebase 데이터 변경 감지:", snapshot.val());
-        const teams = Object.values(snapshot.val()).sort((a, b) => b.total - a.total);
-        const tbody = document.getElementById("scoreTable").querySelector("tbody");
-        tbody.innerHTML = "";
+                if (snapshot.exists()) {
+                    const teams = Object.values(snapshot.val()).sort((a, b) => b.total - a.total);
+                    const tbody = document.getElementById("scoreTable").querySelector("tbody");
+                    tbody.innerHTML = "";
 
-        teams.forEach((team, index) => {
-            const row = tbody.insertRow();
-            row.insertCell().textContent = index + 1;
-            row.insertCell().textContent = team.name;
+                    teams.forEach((team, index) => {
+                        const row = tbody.insertRow();
+                        row.insertCell().textContent = index + 1;
+                        row.insertCell().textContent = team.name;
 
-            team.scores.forEach((score, gameIndex) => {
-                const cell = row.insertCell();
-                const input = document.createElement("input");
-                input.type = "number";
-                input.value = score;
-                input.oninput = (e) => updateScore(team.name, gameIndex, e.target.value);
-                cell.appendChild(input);
+                        team.scores.forEach((score, gameIndex) => {
+                            const cell = row.insertCell();
+                            const input = document.createElement("input");
+                            input.type = "number";
+                            input.value = score;
+                            input.onkeypress = (e) => {
+                                if (e.key === 'Enter') {
+                                    updateScore(team.name, gameIndex, e.target.value);
+                                }
+                            };
+                            cell.appendChild(input);
+                        });
+
+                        row.insertCell().textContent = team.total;
+                    });
+                }
             });
-
-            row.insertCell().textContent = team.total;
-        });
-    }
-});
-
         }
 
         // 초기화 및 테이블 업데이트 시작
