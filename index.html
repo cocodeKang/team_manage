@@ -87,29 +87,31 @@
         // 실시간 데이터 테이블 업데이트
         function updateTable() {
             onValue(teamsRef, (snapshot) => {
-                if (snapshot.exists()) {
-                    const teams = Object.values(snapshot.val()).sort((a, b) => b.total - a.total);
-                    const tbody = document.getElementById("scoreTable").querySelector("tbody");
-                    tbody.innerHTML = "";
+    if (snapshot.exists()) {
+        console.log("Firebase 데이터 변경 감지:", snapshot.val());
+        const teams = Object.values(snapshot.val()).sort((a, b) => b.total - a.total);
+        const tbody = document.getElementById("scoreTable").querySelector("tbody");
+        tbody.innerHTML = "";
 
-                    teams.forEach((team, index) => {
-                        const row = tbody.insertRow();
-                        row.insertCell().textContent = index + 1;
-                        row.insertCell().textContent = team.name;
+        teams.forEach((team, index) => {
+            const row = tbody.insertRow();
+            row.insertCell().textContent = index + 1;
+            row.insertCell().textContent = team.name;
 
-                        team.scores.forEach((score, gameIndex) => {
-                            const cell = row.insertCell();
-                            const input = document.createElement("input");
-                            input.type = "number";
-                            input.value = score;
-                            input.oninput = (e) => updateScore(team.name, gameIndex, e.target.value);
-                            cell.appendChild(input);
-                        });
-
-                        row.insertCell().textContent = team.total;
-                    });
-                }
+            team.scores.forEach((score, gameIndex) => {
+                const cell = row.insertCell();
+                const input = document.createElement("input");
+                input.type = "number";
+                input.value = score;
+                input.oninput = (e) => updateScore(team.name, gameIndex, e.target.value);
+                cell.appendChild(input);
             });
+
+            row.insertCell().textContent = team.total;
+        });
+    }
+});
+
         }
 
         // 초기화 및 테이블 업데이트 시작
