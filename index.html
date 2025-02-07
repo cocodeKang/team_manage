@@ -26,6 +26,7 @@
     }
     th {
       background-color: #f4f4f4;
+      cursor: pointer;
     }
     input[type="number"] {
       width: 50px;
@@ -64,7 +65,8 @@
     <table id="scoreTable">
       <thead>
         <tr>
-          <th rowspan="2">순위</th>
+          <!-- id="rankHeader"를 추가하여 클릭 가능하도록 함 -->
+          <th id="rankHeader" rowspan="2">순위</th>
           <th rowspan="2" class="sticky-col">팀 이름</th>
           <th colspan="5">게임</th>
           <th rowspan="2">합계</th>
@@ -118,6 +120,11 @@
     const db = getDatabase(app);
     const teamsRef = ref(db, "teams");
 
+    // 전역 변수: manualSort가 false이면 기본 정렬(팀 아이디 순), true이면 manual sort 적용
+    let manualSort = false;
+    // sortOrder: "asc" 또는 "desc" (순위 오름차순/내림차순)
+    let sortOrder = "asc";
+
     // 초기 팀 데이터 (10팀 생성)
     async function initializeTeams() {
       const initialTeams = {};
@@ -134,7 +141,7 @@
       await set(teamsRef, initialTeams);
     }
 
-    // 팀 점수 업데이트 함수 (비밀번호 없이 자유롭게 업데이트)
+    // 팀 점수 업데이트 (점수 입력란과 +10/–10 버튼)
     async function updateScore(teamId, gameIndex, value) {
       const teamRef = ref(db, `teams/${teamId}`);
       const snapshot = await get(teamRef);
@@ -148,7 +155,7 @@
       }
     }
 
-    // 팀 이름 업데이트 함수 (비밀번호 없이 자유롭게 업데이트)
+    // 팀 이름 업데이트 함수
     async function updateTeamName(teamId, newName) {
       const teamRef = ref(db, `teams/${teamId}`);
       console.log(`팀 ${teamId}의 이름 업데이트:`, newName);
@@ -164,118 +171,156 @@
       return 0;
     }
 
-    // 테이블 업데이트 – Firebase 실시간 데이터 연동 및 순위별 자동 정렬
+    // 테이블 렌더링 함수
+    function renderTable(teamsData) {
+      const tbody = document.querySelector("#scoreTable tbody");
+      tbody.innerHTML = "";
+      let teams = Object.values(teamsData);
+
+      // 먼저, 총점을 기준으로 내림차순 정렬한 복사본에서 순위 계산
+      let sortedForRank = [...teams].sort((a, b) => b.total - a.total);
+      let currentRank = 0;
+      let previousTotal = null;
+      const rankMap = {};
+      sortedForRank.forEach((team, index) => {
+        if (team.total === previousTotal) {
+          rankMap[team.id] = currentRank;
+        } else {
+          currentRank = index + 1;
+          rankMap[team.id] = currentRank;
+          previousTotal = team.total;
+        }
+      });
+      // 각 팀에 순위 값을 추가
+      teams.forEach(team => {
+        team.rank = rankMap[team.id];
+      });
+
+      // 정렬 조건에 따라 teams 배열 정렬:
+      if (manualSort) {
+        // manualSort가 true이면 계산된 순위 기준으로 정렬
+        if (sortOrder === "asc") {
+          teams.sort((a, b) => a.rank - b.rank);
+        } else {
+          teams.sort((a, b) => b.rank - a.rank);
+        }
+      } else {
+        // 기본 정렬: 팀 아이디 순 (즉, team1, team2, …)
+        teams.sort((a, b) => {
+          const numA = parseInt(a.id.replace("team", ""));
+          const numB = parseInt(b.id.replace("team", ""));
+          return numA - numB;
+        });
+      }
+
+      // 각 팀별 행 생성
+      teams.forEach(team => {
+        const row = tbody.insertRow();
+
+        // 순위 셀
+        const rankCell = row.insertCell();
+        rankCell.textContent = team.rank;
+
+        // 팀 이름 셀 (sticky)
+        const nameCell = row.insertCell();
+        nameCell.classList.add("sticky-col");
+        const nameInput = document.createElement("input");
+        nameInput.type = "text";
+        nameInput.value = team.name;
+        nameInput.onchange = (e) => updateTeamName(team.id, e.target.value);
+        nameCell.appendChild(nameInput);
+
+        // 각 게임별 점수 입력 (입력란 + –10/+10 버튼)
+        team.scores.forEach((score, gameIndex) => {
+          const cell = row.insertCell();
+          const container = document.createElement("div");
+          container.className = "score-container";
+
+          const scoreInput = document.createElement("input");
+          scoreInput.type = "number";
+          scoreInput.value = score;
+          scoreInput.step = 10;
+          scoreInput.onchange = (e) => updateScore(team.id, gameIndex, e.target.value);
+          container.appendChild(scoreInput);
+
+          const minusBtn = document.createElement("button");
+          minusBtn.textContent = "-10";
+          minusBtn.onclick = () => {
+            let currentVal = parseInt(scoreInput.value) || 0;
+            scoreInput.value = currentVal - 10;
+            updateScore(team.id, gameIndex, scoreInput.value);
+          };
+          container.appendChild(minusBtn);
+
+          const plusBtn = document.createElement("button");
+          plusBtn.textContent = "+10";
+          plusBtn.onclick = () => {
+            let currentVal = parseInt(scoreInput.value) || 0;
+            scoreInput.value = currentVal + 10;
+            updateScore(team.id, gameIndex, scoreInput.value);
+          };
+          container.appendChild(plusBtn);
+
+          cell.appendChild(container);
+        });
+
+        // 합계 셀
+        const totalCell = row.insertCell();
+        totalCell.textContent = team.total;
+
+        // 추가 달란트 셀
+        const talentCell = row.insertCell();
+        talentCell.textContent = getAdditionalTalents(team.rank);
+      });
+    }
+
+    // 테이블 업데이트: onValue로 Firebase의 데이터를 실시간 반영하되, 기본 정렬(팀 아이디 순)을 사용
     function updateTable() {
       onValue(teamsRef, (snapshot) => {
-        const tbody = document.querySelector("#scoreTable tbody");
-        tbody.innerHTML = "";  // 기존 tbody 초기화
         if (snapshot.exists()) {
-          const teamsData = snapshot.val();
-          let teams = Object.values(teamsData);
-          console.log("불러온 팀 데이터:", teams);
-
-          // 총점 기준 내림차순 정렬
-          teams.sort((a, b) => b.total - a.total);
-
-          // 순위 계산 (동점이면 같은 순위 부여)
-          let currentRank = 0;
-          let previousTotal = null;
-          teams.forEach((team, index) => {
-            if (team.total === previousTotal) {
-              team.rank = currentRank;
-            } else {
-              currentRank = index + 1;
-              team.rank = currentRank;
-              previousTotal = team.total;
-            }
-          });
-
-          // 1위가 가장 위에 오도록 순위 오름차순 정렬
-          teams.sort((a, b) => a.rank - b.rank);
-
-          teams.forEach((team) => {
-            const row = tbody.insertRow();
-
-            // 순위 셀
-            const rankCell = row.insertCell();
-            rankCell.textContent = team.rank;
-
-            // 팀 이름 셀 (수정 가능한 입력란, sticky 적용)
-            const nameCell = row.insertCell();
-            nameCell.classList.add("sticky-col");
-            const nameInput = document.createElement("input");
-            nameInput.type = "text";
-            nameInput.value = team.name;
-            nameInput.onchange = (e) => updateTeamName(team.id, e.target.value);
-            nameCell.appendChild(nameInput);
-
-            // 각 게임별 점수 입력 – 입력란과 함께 –10, +10 버튼 추가 (step=10 적용)
-            team.scores.forEach((score, gameIndex) => {
-              const cell = row.insertCell();
-              const container = document.createElement("div");
-              container.className = "score-container";
-
-              const scoreInput = document.createElement("input");
-              scoreInput.type = "number";
-              scoreInput.value = score;
-              scoreInput.step = 10;
-              scoreInput.onchange = (e) => updateScore(team.id, gameIndex, e.target.value);
-              container.appendChild(scoreInput);
-
-              // –10 버튼
-              const minusBtn = document.createElement("button");
-              minusBtn.textContent = "-10";
-              minusBtn.onclick = () => {
-                let currentVal = parseInt(scoreInput.value) || 0;
-                scoreInput.value = currentVal - 10;
-                updateScore(team.id, gameIndex, scoreInput.value);
-              };
-              container.appendChild(minusBtn);
-
-              // +10 버튼
-              const plusBtn = document.createElement("button");
-              plusBtn.textContent = "+10";
-              plusBtn.onclick = () => {
-                let currentVal = parseInt(scoreInput.value) || 0;
-                scoreInput.value = currentVal + 10;
-                updateScore(team.id, gameIndex, scoreInput.value);
-              };
-              container.appendChild(plusBtn);
-
-              cell.appendChild(container);
-            });
-
-            // 합계 셀
-            const totalCell = row.insertCell();
-            totalCell.textContent = team.total;
-
-            // 추가 달란트 셀
-            const talentCell = row.insertCell();
-            talentCell.textContent = getAdditionalTalents(team.rank);
-          });
+          const data = snapshot.val();
+          renderTable(data);
         } else {
           console.log("Firebase에 팀 데이터가 없습니다.");
         }
       });
     }
 
-    // DOMContentLoaded – Firebase 데이터 존재 여부 확인 후 초기화 및 이벤트 등록
+    // 순위 헤더 셀 클릭 시 manualSort를 활성화(또는 토글)하여 정렬 순서를 변경
+    document.getElementById("rankHeader").addEventListener("click", () => {
+      if (!manualSort) {
+        manualSort = true;
+        sortOrder = "asc"; // 처음 클릭 시 오름차순
+      } else {
+        // 이미 manualSort가 활성화된 경우 오름차순과 내림차순을 토글
+        sortOrder = (sortOrder === "asc") ? "desc" : "asc";
+      }
+      // Firebase에서 데이터를 다시 불러와 재렌더링
+      get(teamsRef).then(snapshot => {
+        if (snapshot.exists()) {
+          renderTable(snapshot.val());
+        }
+      });
+    });
+
+    // 초기화 버튼: 클릭 시 비밀번호(4787)를 prompt로 입력받고, 올바르면 팀 데이터 초기화
+    document.getElementById("resetButton").addEventListener("click", async () => {
+      const pwd = prompt("초기화를 위한 비밀번호를 입력하세요:");
+      if (pwd !== "4787") {
+        alert("비밀번호가 틀렸습니다.");
+        return;
+      }
+      if (confirm("정말 데이터를 초기화하시겠습니까?")) {
+        await initializeTeams();
+      }
+    });
+
+    // DOMContentLoaded 시 Firebase에 팀 데이터가 없으면 초기화 후 테이블 업데이트 시작
     document.addEventListener("DOMContentLoaded", async () => {
       const teamsSnapshot = await get(teamsRef);
       if (!teamsSnapshot.exists()) {
         await initializeTeams();
       }
-      // 초기화 버튼: 클릭 시 비밀번호(4787)를 prompt로 입력받아 확인 후 초기화 실행
-      document.getElementById("resetButton").addEventListener("click", async () => {
-        const pwd = prompt("초기화를 위한 비밀번호를 입력하세요:");
-        if (pwd !== "4787") {
-          alert("비밀번호가 틀렸습니다.");
-          return;
-        }
-        if (confirm("정말 데이터를 초기화하시겠습니까?")) {
-          await initializeTeams();
-        }
-      });
       updateTable();
     });
   </script>
