@@ -26,110 +26,12 @@
             width: 50px;
         }
     </style>
-    <script type="module">
-        // Firebase 설정    
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.3.0/firebase-app.js";
-        import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/11.3.0/firebase-database.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyD9E6RI1DUmQqJI8f70t9YwMlp1xiTAQis",
-            authDomain: "team-score-manager.firebaseapp.com",
-            databaseURL: "https://team-score-manager-default-rtdb.firebaseio.com",
-            projectId: "team-score-manager",
-            storageBucket: "team-score-manager.appspot.com",
-            messagingSenderId: "566490541048",
-            appId: "1:566490541048:web:050eb2f4984872da91440d",
-            measurementId: "G-4DH92WNSPF"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
-        const teamsRef = ref(db, "teams");
-
-        function addTeam() {
-    const teamName = document.getElementById("teamName").value.trim();
-    if (teamName === "") {
-        console.error("팀 이름이 비어 있습니다.");
-        return;
-    }
-
-    const newTeam = {
-        name: teamName,
-        scores: [0, 0, 0, 0, 0],
-        total: 0
-    };
-
-    console.log("추가할 팀 데이터:", newTeam);
-
-    update(teamsRef, { [teamName]: newTeam })
-        .then(() => console.log("팀 추가 성공:", newTeam))
-        .catch((error) => console.error("팀 추가 실패:", error));
-    
-    document.getElementById("teamName").value = "";
-}
-
-        function updateScore(teamName, gameIndex, value) {
-            get(teamsRef).then(snapshot => {
-                if (snapshot.exists()) {
-                    const teams = snapshot.val();
-                    if (teams[teamName]) {
-                        teams[teamName].scores[gameIndex] = parseInt(value) || 0;
-                        teams[teamName].total = teams[teamName].scores.reduce((a, b) => a + b, 0);
-                        update(teamsRef, { [teamName]: teams[teamName] });
-                    }
-                }
-            });
-        }
-
-        function resetScores() {
-            get(teamsRef).then(snapshot => {
-                if (snapshot.exists()) {
-                    const teams = snapshot.val();
-                    for (let teamName in teams) {
-                        teams[teamName].scores = [0, 0, 0, 0, 0];
-                        teams[teamName].total = 0;
-                    }
-                    set(teamsRef, teams);
-                }
-            });
-        }
-
-        function updateTable() {
-            onValue(teamsRef, snapshot => {
-                if (snapshot.exists()) {
-                    const teams = Object.values(snapshot.val()).sort((a, b) => b.total - a.total);
-                    const tbody = document.getElementById("scoreTable").querySelector("tbody");
-                    tbody.innerHTML = "";
-                    
-                    teams.forEach((team, index) => {
-                        const row = tbody.insertRow();
-                        row.insertCell().textContent = index + 1;
-                        row.insertCell().textContent = team.name;
-                        
-                        team.scores.forEach((score, gameIndex) => {
-                            const cell = row.insertCell();
-                            const input = document.createElement("input");
-                            input.type = "number";
-                            input.value = score;
-                            input.oninput = (e) => updateScore(team.name, gameIndex, e.target.value);
-                            cell.appendChild(input);
-                        });
-                        
-                        row.insertCell().textContent = team.total;
-                    });
-                }
-            });
-        }
-        
-        window.onload = updateTable;
-    </script>
 </head>
 <body>
     <h1>팀 점수 관리 시스템</h1>
     <input type="text" id="teamName" placeholder="팀 이름 입력">
     <button onclick="addTeam()">팀 추가</button>
-    <button onclick="resetScores()">초기화</button>
-    
+
     <table id="scoreTable">
         <thead>
             <tr>
@@ -143,8 +45,100 @@
                 <th>합계</th>
             </tr>
         </thead>
-        <tbody>
-        </tbody>
+        <tbody></tbody>
     </table>
+
+    <script type="module">
+        import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+
+        const SUPABASE_URL = "https://ubczipoavpszqgmvawvf.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InViY3ppcG9hdnBzenFnbXZhd3ZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzg5Mjc5NTgsImV4cCI6MjA1NDUwMzk1OH0.GWG1tSlxP0IH5SJ0jzg_yUwLLsPRNZpa9yfWmlmvJ1E";
+
+        const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        async function addTeam() {
+            const teamName = document.getElementById("teamName").value.trim();
+            if (!teamName) {
+                console.error("팀 이름이 비어 있습니다.");
+                return;
+            }
+
+            const newTeam = { name: teamName, scores: [0, 0, 0, 0, 0], total: 0 };
+            const { data, error } = await supabase.from("teams").insert([newTeam]);
+
+            if (error) {
+                console.error("팀 추가 실패:", error);
+            } else {
+                console.log("팀 추가 성공:", data);
+                document.getElementById("teamName").value = "";
+            }
+        }
+
+        async function updateTable() {
+            const { data: teams, error } = await supabase
+                .from("teams")
+                .select("*")
+                .order("total", { ascending: false });
+
+            if (error) {
+                console.error("데이터 가져오기 실패:", error);
+                return;
+            }
+
+            const tbody = document.getElementById("scoreTable").querySelector("tbody");
+            tbody.innerHTML = "";
+
+            teams.forEach((team, index) => {
+                const row = tbody.insertRow();
+                row.insertCell().textContent = index + 1;
+                row.insertCell().textContent = team.name;
+
+                team.scores.forEach((score, gameIndex) => {
+                    const cell = row.insertCell();
+                    const input = document.createElement("input");
+                    input.type = "number";
+                    input.value = score;
+                    input.oninput = async (e) => updateScore(team.id, gameIndex, e.target.value);
+                    cell.appendChild(input);
+                });
+
+                row.insertCell().textContent = team.total;
+            });
+        }
+
+        async function updateScore(teamId, gameIndex, value) {
+            const { data, error } = await supabase
+                .from("teams")
+                .select("*")
+                .eq("id", teamId)
+                .single();
+
+            if (error) {
+                console.error("데이터 가져오기 실패:", error);
+                return;
+            }
+
+            data.scores[gameIndex] = parseInt(value) || 0;
+            data.total = data.scores.reduce((a, b) => a + b, 0);
+
+            const { error: updateError } = await supabase
+                .from("teams")
+                .update({ scores: data.scores, total: data.total })
+                .eq("id", teamId);
+
+            if (updateError) {
+                console.error("점수 업데이트 실패:", updateError);
+            }
+        }
+
+        supabase
+            .channel("realtime:teams")
+            .on("postgres_changes", { event: "*", schema: "public", table: "teams" }, () => {
+                updateTable();
+            })
+            .subscribe();
+
+        window.onload = updateTable;
+    </script>
 </body>
 </html>
