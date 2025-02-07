@@ -55,34 +55,44 @@
     }
 
     // 실시간 데이터 테이블 업데이트
-    function updateTable() {
-        onValue(teamsRef, (snapshot) => {
-            if (snapshot.exists()) {
-                const teams = Object.values(snapshot.val()).sort((a, b) => b.total - a.total);
-                const tbody = document.getElementById("scoreTable").querySelector("tbody");
-                tbody.innerHTML = "";
+    // 실시간 데이터 테이블 업데이트
+function updateTable() {
+    onValue(teamsRef, (snapshot) => {
+        if (snapshot.exists()) {
+            const scoreTable = document.getElementById("scoreTable");
+            if (scoreTable) {
+                const tbody = scoreTable.querySelector("tbody");
+                if (tbody) {
+                    const teams = Object.values(snapshot.val()).sort((a, b) => b.total - a.total);
+                    tbody.innerHTML = "";
 
-                teams.forEach((team, index) => {
-                    const row = tbody.insertRow();
-                    row.insertCell().textContent = index + 1;
-                    row.insertCell().textContent = team.name;
+                    teams.forEach((team, index) => {
+                        const row = tbody.insertRow();
+                        row.insertCell().textContent = index + 1;
+                        row.insertCell().textContent = team.name;
 
-                    team.scores.forEach((score, gameIndex) => {
-                        const cell = row.insertCell();
-                        const input = document.createElement("input");
-                        input.type = "number";
-                        input.value = score;
-                        input.onchange = (e) => {
-                            updateScore(team.name, gameIndex, e.target.value);
-                        };
-                        cell.appendChild(input);
+                        team.scores.forEach((score, gameIndex) => {
+                            const cell = row.insertCell();
+                            const input = document.createElement("input");
+                            input.type = "number";
+                            input.value = score;
+                            input.onchange = (e) => {
+                                updateScore(team.name, gameIndex, e.target.value);
+                            };
+                            cell.appendChild(input);
+                        });
+
+                        row.insertCell().textContent = team.total;
                     });
-
-                    row.insertCell().textContent = team.total;
-                });
+                } else {
+                    console.error("tbody element not found");
+                }
+            } else {
+                console.error("scoreTable element not found");
             }
-        });
-    }
+        }
+    });
+}
 
     // 초기화 버튼 이벤트
     document.addEventListener("DOMContentLoaded", () => {
