@@ -1,25 +1,94 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>팀 점수 관리</title>
-    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        table {
+            width: 80%;
+            margin: 20px auto;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+        input[type="number"] {
+            width: 50px;
+        }
+    </style>
 </head>
 <body>
-    <h1>실시간 팀 점수 관리</h1>
+    <h1>팀 점수 관리 시스템</h1>
+    <input type="text" id="teamName" placeholder="팀 이름 입력">
+    <button onclick="addTeam()">팀 추가</button>
+    
     <table id="scoreTable">
         <thead>
             <tr>
+                <th>순위</th>
                 <th>팀 이름</th>
-                <th>점수</th>
+                <th>게임1</th>
+                <th>게임2</th>
+                <th>게임3</th>
+                <th>게임4</th>
+                <th>게임5</th>
+                <th>합계</th>
             </tr>
         </thead>
         <tbody>
-            <!-- 점수 데이터가 여기에 동적으로 추가됩니다 -->
         </tbody>
     </table>
+    
+    <script>
+        let teams = [];
 
-    <script src="app.js"></script>
+        function addTeam() {
+            const teamName = document.getElementById("teamName").value.trim();
+            if (teamName === "") return;
+            
+            teams.push({ name: teamName, scores: [0, 0, 0, 0, 0], total: 0 });
+            document.getElementById("teamName").value = "";
+            updateTable();
+        }
+
+        function updateScore(teamIndex, gameIndex, value) {
+            teams[teamIndex].scores[gameIndex] = parseInt(value) || 0;
+            teams[teamIndex].total = teams[teamIndex].scores.reduce((a, b) => a + b, 0);
+            updateTable();
+        }
+
+        function updateTable() {
+            teams.sort((a, b) => b.total - a.total);
+            const tbody = document.getElementById("scoreTable").querySelector("tbody");
+            tbody.innerHTML = "";
+            
+            teams.forEach((team, index) => {
+                const row = tbody.insertRow();
+                row.insertCell().textContent = index + 1;
+                row.insertCell().textContent = team.name;
+                
+                team.scores.forEach((score, gameIndex) => {
+                    const cell = row.insertCell();
+                    const input = document.createElement("input");
+                    input.type = "number";
+                    input.value = score;
+                    input.oninput = (e) => updateScore(index, gameIndex, e.target.value);
+                    cell.appendChild(input);
+                });
+                
+                row.insertCell().textContent = team.total;
+            });
+        }
+    </script>
 </body>
 </html>
