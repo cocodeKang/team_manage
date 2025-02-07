@@ -47,18 +47,26 @@
         const teamsRef = ref(db, "teams");
 
         function addTeam() {
-            const teamName = document.getElementById("teamName").value.trim();
-            if (teamName === "") return;
-            
-            const newTeam = {
-                name: teamName,
-                scores: [0, 0, 0, 0, 0],
-                total: 0
-            };
-            
-            update(teamsRef, { [teamName]: newTeam });
-            document.getElementById("teamName").value = "";
-        }
+    const teamName = document.getElementById("teamName").value.trim();
+    if (teamName === "") {
+        console.error("팀 이름이 비어 있습니다.");
+        return;
+    }
+
+    const newTeam = {
+        name: teamName,
+        scores: [0, 0, 0, 0, 0],
+        total: 0
+    };
+
+    console.log("추가할 팀 데이터:", newTeam);
+
+    update(teamsRef, { [teamName]: newTeam })
+        .then(() => console.log("팀 추가 성공:", newTeam))
+        .catch((error) => console.error("팀 추가 실패:", error));
+    
+    document.getElementById("teamName").value = "";
+}
 
         function updateScore(teamName, gameIndex, value) {
             get(teamsRef).then(snapshot => {
